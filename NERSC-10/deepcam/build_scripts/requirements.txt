@@ -1,0 +1,23 @@
+cython==0.29.34
+numpy==1.23.5
+h5py==3.8.0
+pyyaml==6.0
+warmup-scheduler 
+  git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git@v0.3.2 
+mlperf-logging @ git+https://github.com/mlperf/logging.git@2.0.0-rc4
+
+#from pytorch  
+astunparse==1.6.3
+expecttest==0.1.4
+hypothesis==6.70.2
+psutil==5.9.4
+requests==2.28.2
+setuptools==67.6.1
+types-dataclasses==0.6.6
+typing-extensions==4.5.0
+sympy==1.11.1
+filelock==3.10.7
+networkx==3.1
+jinja2==3.1.2
+pyyaml==6.0
+
