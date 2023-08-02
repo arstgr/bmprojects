@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -N hmmbench_tiny
+#PBS -l walltime=00:20:00
+#PBS -l select=1:ncpus=176:mpiprocs=1:ompthreads=1
+#PBS -l place=scatter:exclhost
+#PBS -j oe
+
+ulimit -s unlimited
+ulimit -l unlimited
+ulimit -a
+
+module load mpi/hpcx
+cd $PBS_O_WORKDIR
+HMM_BENCH=../..
+HMM_DATA=$HMM_BENCH/data
+HMM_SEARCH=$HMM_BENCH/hmmer-3.3.2/src/hpc_hmmsearch
+
+mkdir tiny-${PBS_JOBID} ; cd tiny-${PBS_JOBID}
+cp ${0} pbs_script
+ln -s $HMM_DATA .
+module list
+
+TINY=4000
+$HMM_BENCH/scripts/splits.sh $HMM_DATA/Pfam-A.hmm $TINY
+$HMM_BENCH/scripts/splits.sh $HMM_DATA/uniprot_sprot.fasta $TINY
+TINY_PFAM=Pfam-A-${TINY}.hmm
+TINY_SPROT=uniprot_sprot-${TINY}.fasta
+
+date_i=$(date '+%s')
+
+NCPU=1
+NHWT=1
+NTASKS=1
+HMM_CMD="$HMM_SEARCH \
+       --cpu ${NCPU} \
+       -o out.txt \
+       --noali \
+       $TINY_PFAM \
+       $TINY_SPROT"
+
+mpirun \
+	-machinefile $PBS_NODEFILE \
+	-x LD_LIBRARY_PATH         \
+	-x LD_PRELOAD              \
+	-x PATH                    \
+	-np $NTASKS \
+	--map-by ppr:$NCPU:node:PE=$NHWT \
+	$HMM_CMD
+
+date_f=$(date '+%s')
+
+walltime=$(( date_f - date_i )) 
+echo "HMMsearch_walltime: $walltime" | tee timing.log
+$HMM_BENCH/scripts/validate.py $HMM_BENCH/data/ref_output_tiny.txt out.txt

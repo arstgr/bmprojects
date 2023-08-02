@@ -1,0 +1,61 @@
+#!/bin/bash
+#PBS -N hmmbench_single
+#PBS -l walltime=20:00
+#PBS -l select=1:ncpus=176:mpiprocs=1:ompthreads=1
+#PBS -l place=scatter:exclhost
+#PBS -j oe
+
+ulimit -s unlimited
+ulimit -l unlimited
+ulimit -a
+module load mpi/hpcx
+
+cd $PBS_O_WORKDIR
+HMM_BENCH=../..
+HMM_DATA=$HMM_BENCH/data
+HMM_SEARCH=$HMM_BENCH/hmmer-3.3.2/src/hpc_hmmsearch
+
+mkdir single-${PBS_JOBID} ; cd single-${PBS_JOBID}
+cp ${0} pbs_script
+ln -s $HMM_DATA .
+module list
+
+NCPU=44
+NHWT=44
+NTASKS=1
+
+export OMP_NUM_THREADS=$NHWT
+
+HMM_CMD="$HMM_SEARCH \
+       --cpu ${NCPU} \
+       -o out.txt \
+       --noali \
+       data/Pfam-A.hmm \
+       data/uniprot_sprot.fasta"
+
+date_i=$(date '+%s')
+
+#mpirun \
+#	-machinefile $PBS_NODEFILE \
+#	-x LD_LIBRARY_PATH         \
+#	-x LD_PRELOAD              \
+#	-x PATH                    \
+#	-np $NTASKS \
+#	--map-by ppr:$NTASKS:node:PE=$NHWT \
+#	$HMM_CMD
+mpirun \
+	-machinefile $PBS_NODEFILE \
+	-x LD_LIBRARY_PATH         \
+	-x LD_PRELOAD              \
+	-x PATH                    \
+	-np $NTASKS \
+	--map-by ppr:$NTASKS:node:PE=$NHWT \
+	--report-bindings \
+	$HMM_CMD | tee output.log
+
+date_f=$(date '+%s')
+
+
+walltime=$(( date_f - date_i ))
+echo "HMMsearch_walltime: $walltime" | tee -a timing.log
+$HMM_BENCH/scripts/validate.py $HMM_BENCH/data/ref_output_single.txt out.txt

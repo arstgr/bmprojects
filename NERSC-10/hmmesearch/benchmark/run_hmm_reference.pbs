@@ -1,0 +1,70 @@
+#!/bin/bash
+#!/bin/bash
+#PBS -N hmmbench_reference
+#PBS -l walltime=20:00
+#PBS -l select=1:ncpus=176:mpiprocs=176
+#PBS -l place=scatter:exclhost
+#PBS -j oe
+#PBS -J 1-4
+
+ulimit -s unlimited
+ulimit -l unlimited
+ulimit -a
+module load mpi/hpcx
+
+cd $PBS_O_WORKDIR
+HMM_BENCH=../..
+HMM_DATA=$HMM_BENCH/data
+HMM_SEARCH=$HMM_BENCH/hmmer-3.3.2/src/hpc_hmmsearch
+
+JOBID=`echo ${PBS_JOBID} | cut -d'[' -f1`
+mkdir reference-$JOBID ; cd reference-$JOBID
+cp ${0} pbs_script
+ln -s $HMM_DATA .
+module list
+
+nhost=$(cat $PBS_NODEFILE | sort -u | wc -l)
+
+TASKS_PER_NODE=1
+NTASKS=$(( nhost * TASKS_PER_NODE ))
+NCPU=$(( 176 / TASKS_PER_NODE))
+NHWT=$NCPU
+export OMP_NUM_THREADS=$NHWT 
+
+#using slurm's MPMD features to launch concurrent hpc_hmmsearch tasks
+#slurm will replace %o with the task-id
+#so that the output of each task will go to its own file: out-%0.txt
+HMM_CMD="$HMM_SEARCH \
+       --cpu ${NCPU} \
+       -o out-${PBS_ARRAY_INDEX}.txt \
+       --noali \
+       data/Pfam-A.hmm \
+       data/uniprot_sprot.fasta"
+
+echo "$HMM_CMD" > reference-${PBS_ARRAY_INDEX}.conf
+
+date_i=$(date '+%s')
+
+mpirun \
+	-x LD_LIBRARY_PATH         \
+	-x PATH                    \
+	-x OMP_NUM_THREADS         \
+	-np ${TASKS_PER_NODE} \
+	--map-by ppr:${TASKS_PER_NODE}:node:PE=$NHWT \
+	--report-bindings \
+	-app ./reference-${PBS_ARRAY_INDEX}.conf | tee -a output-${PBS_ARRAY_INDEX}.log
+
+date_f=$(date '+%s')
+
+
+walltime=$(( date_f - date_i )) 
+echo "HMMsearch_walltime: $walltime" | tee -a timing-${PBS_ARRAY_INDEX}.log
+$HMM_BENCH/scripts/validate.py $HMM_BENCH/data/ref_output_single.txt out-1.txt
+
+#clean up the output files, saving only the 0th
+cleanup=0
+if [ $cleanup -eq 1 ]; then
+  mv out-1.txt tmp-out-1.txt
+  rm out-*.txt
+  mv tmp-out-1.txt out-1.txt
+fi
