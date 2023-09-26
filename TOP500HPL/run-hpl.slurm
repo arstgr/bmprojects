@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 00:20:00
-#SBATCH --nodes=2
+#SBATCH --nodes=16
 #SBATCH --ntasks-per-node=8
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=12
@@ -21,7 +21,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda/lib64/:$LD_LIBRARY_PATH
 
 export UCX_IB_PCI_RELAXED_ORDERING=on 
 export CUDA_DEVICE_ORDER=PCI_BUS_ID 
-export NCCL_DEBUG=INFO 
+export NCCL_DEBUG=WARN   #INFO
 export NCCL_IB_PCI_RELAXED_ORDERING=1 
 export NCCL_TOPO_FILE=/opt/microsoft/ndv5-topo.xml 
 export NCCL_SOCKET_IFNAME=eth0 
